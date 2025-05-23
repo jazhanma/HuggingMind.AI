@@ -100,4 +100,25 @@ app/
 
 ## License
 
-MIT 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### LLaMA 2 License Requirements
+
+This project uses the LLaMA 2 model from Meta AI, which has its own licensing requirements:
+
+1. **Required Approval**: 
+   - Users must accept Meta's terms at [LLaMA 2 License](https://ai.meta.com/llama/license/)
+   - Obtain approval from Meta (usually instant for individual/research use)
+
+2. **Usage Terms**:
+   - Free for research and commercial use
+   - Commercial use allowed for companies with <700M monthly active users
+   - Must provide attribution to Meta AI
+   - Must indicate the use of "LLaMA 2"
+
+3. **Restrictions**:
+   - No illegal purposes
+   - No training other models without permission
+   - Other restrictions as detailed in Meta's license
+
+Please ensure you have accepted Meta's terms and received approval before using this project with the LLaMA 2 model. 

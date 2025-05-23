@@ -13,10 +13,21 @@ services:
   - type: web
     name: huggingmind-backend
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      pip install requests tqdm
+      python scripts/download_model.py
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
-      - key: CORS_ORIGINS
-        value: https://huggingmind.vercel.app 
+      - key: PYTHON_ENV
+        value: production
+      - key: MODEL_PATH
+        value: /opt/render/project/src/models/model-q4_k_m.gguf
+    plan: standard
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    healthCheckPath: /health
+    autoDeploy: true 

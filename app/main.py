@@ -24,6 +24,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
+        "https://huggingmind-ai.vercel.app",  # Your Vercel frontend URL
+        "https://huggingmind-backend.onrender.com",  # Your Render backend URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -92,6 +94,10 @@ async def root():
             "/": "This help message"
         }
     }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 @app.on_event("startup")
 async def on_startup():
