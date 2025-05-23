@@ -1,0 +1,22 @@
+services:
+  # Frontend Service
+  - type: web
+    name: huggingmind-frontend
+    env: node
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  # Backend Service
+  - type: web
+    name: huggingmind-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: CORS_ORIGINS
+        value: https://huggingmind.vercel.app 
