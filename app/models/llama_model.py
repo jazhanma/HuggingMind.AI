@@ -1,4 +1,5 @@
 import os
+import requests
 from typing import List, Optional, Dict, Any
 from llama_cpp import Llama
 from app.config import get_settings
@@ -18,15 +19,27 @@ class LlamaModel:
 
     def _initialize_model(self):
         settings = get_settings()
-        
+        model_url = os.getenv("MODEL_URL")
+        local_path = "/tmp/model.gguf"
+
         try:
             print("Initializing LLaMA model...")
-            print(f"Loading model from {settings.MODEL_PATH}")
+            
+            if not os.path.exists(local_path):
+                print("Downloading model from:", model_url)
+                response = requests.get(model_url, stream=True)
+                with open(local_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                print("Model downloaded successfully!")
+            else:
+                print("Using existing model file from:", local_path)
+
             print(f"GPU Layers: {settings.GPU_LAYERS}")
             print(f"Context Length: {settings.CONTEXT_LENGTH}")
             
             self._model = Llama(
-                model_path=settings.MODEL_PATH,
+                model_path=local_path,
                 n_ctx=settings.CONTEXT_LENGTH,
                 n_gpu_layers=settings.GPU_LAYERS,
                 n_threads=settings.THREADS,
