@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import sys
 from app.config import get_settings
 from app.models.llama_model import LlamaModel
 from app.api.routes import router as api_router
@@ -12,7 +13,13 @@ from app.startup import startup
 settings = get_settings()
 
 # Get port from environment variable with a default
-PORT = int(os.getenv("PORT", 8000))
+try:
+    PORT = int(os.environ.get("PORT", 8000))
+    print(f"Using port: {PORT}")
+except Exception as e:
+    print(f"Error setting port: {e}")
+    PORT = 8000
+    print(f"Falling back to default port: {PORT}")
 
 app = FastAPI(
     title="HuggingMind AI - LLaMA 2 Chat API",
@@ -20,28 +27,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+print(f"FastAPI app initialized with port {PORT}")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "https://huggingmind-ai.vercel.app",  # Your Vercel frontend URL
-        "https://huggingmind-backend.onrender.com",  # Your Render backend URL
-        "*",  # Allow all origins in development
-    ],
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=[
-        "Content-Type",
-        "Authorization",
-        "Accept",
-        "Origin",
-        "X-Requested-With",
-    ],
-    expose_headers=["*"],
+    allow_headers=["*"],
 )
 
 # Include API routes
@@ -107,9 +101,21 @@ async def health_check():
 @app.on_event("startup")
 async def on_startup():
     """Initialize application on startup"""
-    print(f"Starting server on port {PORT}")
-    startup()
+    try:
+        print(f"Starting server on port {PORT}")
+        print(f"Environment variables: {dict(os.environ)}")
+        startup()
+    except Exception as e:
+        print(f"Error during startup: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT) 
+    print(f"Running app directly with port {PORT}")
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=PORT,
+        reload=True,
+        log_level="info"
+    ) 
