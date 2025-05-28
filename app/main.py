@@ -4,22 +4,29 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 import sys
+import logging
 from app.config import get_settings
 from app.models.llama_model import LlamaModel
 from app.api.routes import router as api_router
 from app.api.api_keys import router as api_key_router
 from app.startup import startup
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
 
 # Get port from environment variable with a default
 try:
     PORT = int(os.environ.get("PORT", 8000))
-    print(f"Using port: {PORT}")
+    HOST = os.environ.get("HOST", "0.0.0.0")
+    logger.info(f"Configuring server with HOST={HOST} and PORT={PORT}")
 except Exception as e:
-    print(f"Error setting port: {e}")
+    logger.error(f"Error setting port: {e}")
     PORT = 8000
-    print(f"Falling back to default port: {PORT}")
+    HOST = "0.0.0.0"
+    logger.info(f"Falling back to default HOST={HOST} and PORT={PORT}")
 
 app = FastAPI(
     title="HuggingMind AI - LLaMA 2 Chat API",
@@ -27,7 +34,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-print(f"FastAPI app initialized with port {PORT}")
+logger.info(f"FastAPI app initialized with HOST={HOST} and PORT={PORT}")
 
 # Add CORS middleware
 app.add_middleware(
@@ -102,20 +109,25 @@ async def health_check():
 async def on_startup():
     """Initialize application on startup"""
     try:
-        print(f"Starting server on port {PORT}")
-        print(f"Environment variables: {dict(os.environ)}")
+        logger.info("Starting application initialization...")
+        logger.info(f"Environment variables: {dict(os.environ)}")
+        logger.info(f"Current working directory: {os.getcwd()}")
+        logger.info(f"Binding to HOST={HOST} and PORT={PORT}")
+        
+        # Initialize other components
         startup()
+        
+        logger.info("Application startup complete!")
     except Exception as e:
-        print(f"Error during startup: {e}")
+        logger.error(f"Critical error during startup: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"Running app directly with port {PORT}")
+    logger.info(f"Running app directly with HOST={HOST} and PORT={PORT}")
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
+        host=HOST,
         port=PORT,
-        reload=True,
         log_level="info"
     ) 
