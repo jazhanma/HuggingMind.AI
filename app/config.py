@@ -6,10 +6,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default to production path if in production environment
-DEFAULT_MODEL_PATH = "/opt/render/project/src/models/model-q4_k_m.gguf" if os.getenv("PYTHON_ENV") == "production" else r"C:\Users\jaska\.llama\checkpoints\Llama-2-7b-chat\model-q4_k_m.gguf"
+DEFAULT_MODEL_PATH = "/tmp/model.gguf"
 
 class Settings(BaseModel):
     # Model settings
+    MODEL_URL: str = os.getenv("MODEL_URL", "")  # URL to download the model from
     MODEL_PATH: str = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
     CONTEXT_LENGTH: int = int(os.getenv("CONTEXT_LENGTH", "2048"))
     GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "35"))  # Number of layers to offload to GPU

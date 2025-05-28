@@ -19,27 +19,35 @@ class LlamaModel:
 
     def _initialize_model(self):
         settings = get_settings()
-        model_url = os.getenv("MODEL_URL")
-        local_path = "/tmp/model.gguf"
-
+        
         try:
             print("Initializing LLaMA model...")
             
-            if not os.path.exists(local_path):
-                print("Downloading model from:", model_url)
-                response = requests.get(model_url, stream=True)
-                with open(local_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                print("Model downloaded successfully!")
+            if settings.MODEL_URL:
+                print("Downloading model from:", settings.MODEL_URL)
+                if not os.path.exists(settings.MODEL_PATH):
+                    response = requests.get(settings.MODEL_URL, stream=True)
+                    response.raise_for_status()  # Raise an error for bad status codes
+                    
+                    # Create directory if it doesn't exist
+                    os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
+                    
+                    with open(settings.MODEL_PATH, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    print("Model downloaded successfully!")
+                else:
+                    print("Using existing model file from:", settings.MODEL_PATH)
             else:
-                print("Using existing model file from:", local_path)
+                print("No MODEL_URL provided, using existing model at:", settings.MODEL_PATH)
+                if not os.path.exists(settings.MODEL_PATH):
+                    raise ValueError(f"Model file not found at {settings.MODEL_PATH} and no MODEL_URL provided")
 
             print(f"GPU Layers: {settings.GPU_LAYERS}")
             print(f"Context Length: {settings.CONTEXT_LENGTH}")
             
             self._model = Llama(
-                model_path=local_path,
+                model_path=settings.MODEL_PATH,
                 n_ctx=settings.CONTEXT_LENGTH,
                 n_gpu_layers=settings.GPU_LAYERS,
                 n_threads=settings.THREADS,
