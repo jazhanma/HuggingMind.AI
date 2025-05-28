@@ -1,1 +1,1 @@
-web: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout-keep-alive 75 --log-level info --use-colors --proxy-headers --forwarded-allow-ips '*' 
+web: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --limit-concurrency 1 --timeout-keep-alive 75 --log-level info 

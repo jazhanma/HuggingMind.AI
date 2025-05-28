@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
 import sys
 import logging
-import socket
+import asyncio
 from app.config import get_settings
 from app.models.llama_model import LlamaModel
 from app.api.routes import router as api_router
@@ -23,11 +23,11 @@ settings = get_settings()
 
 # Get port from environment variable with a default
 try:
-    PORT = int(os.environ.get("PORT", 8000))
-    HOST = os.environ.get("HOST", "0.0.0.0")
+    PORT = int(os.environ.get("PORT", "8000"))
+    HOST = "0.0.0.0"  # Always bind to 0.0.0.0 for container deployments
     logger.info(f"Configuring server with HOST={HOST} and PORT={PORT}")
 except Exception as e:
-    logger.error(f"Error parsing PORT or HOST: {e}")
+    logger.error(f"Error parsing PORT: {e}")
     sys.exit(1)
 
 logger.info(f"Starting application with HOST={HOST} PORT={PORT}")
@@ -49,6 +49,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global variable to track model initialization
+model_initialized = False
+model_instance = None
+
 # Include API routes
 app.include_router(api_router, prefix="/api")
 app.include_router(api_key_router, prefix="/api/keys")
@@ -68,17 +72,32 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
+async def initialize_model_async():
+    """Initialize the model in the background"""
+    global model_initialized, model_instance
+    try:
+        logger.info("Starting model initialization in background...")
+        model_instance = LlamaModel()
+        model_initialized = True
+        logger.info("Model initialization complete!")
+    except Exception as e:
+        logger.error(f"Failed to initialize model: {e}")
+        model_initialized = False
+        raise
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    global model_initialized, model_instance
+    
+    if not model_initialized:
+        raise HTTPException(status_code=503, detail="Model is still initializing. Please try again in a few minutes.")
+    
     try:
-        # Initialize model (uses singleton pattern)
-        model = LlamaModel()
-        
         # Convert messages to list of dicts
         messages = [msg.dict() for msg in request.messages]
         
         # Generate response
-        response = model.chat(
+        response = model_instance.chat(
             messages=messages,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -98,6 +117,7 @@ async def root():
         "name": "HuggingMind AI - LLaMA 2 Chat API",
         "version": "1.0.0",
         "model": "LLaMA 2 7B Chat",
+        "model_status": "initialized" if model_initialized else "initializing",
         "endpoints": {
             "/api/chat": "Chat with the model",
             "/api/keys": "API key management",
@@ -107,16 +127,14 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    try:
-        # Try to create a socket with the configured host and port
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind((HOST, PORT))
-        sock.close()
-        logger.info(f"Health check: Successfully bound to {HOST}:{PORT}")
-        return {"status": "healthy", "port": PORT, "host": HOST}
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {"status": "unhealthy", "error": str(e), "port": PORT, "host": HOST}
+    return {
+        "status": "healthy",
+        "port": PORT,
+        "host": HOST,
+        "pid": os.getpid(),
+        "cwd": os.getcwd(),
+        "model_status": "initialized" if model_initialized else "initializing"
+    }
 
 @app.on_event("startup")
 async def on_startup():
@@ -124,24 +142,13 @@ async def on_startup():
     try:
         logger.info("Starting application initialization...")
         logger.info(f"Python version: {sys.version}")
+        logger.info(f"Process ID: {os.getpid()}")
         logger.info(f"Current working directory: {os.getcwd()}")
-        logger.info(f"Environment variables: {dict(os.environ)}")
-        logger.info(f"Binding to HOST={HOST} PORT={PORT}")
         
-        # Test socket binding
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.bind((HOST, PORT))
-            sock.close()
-            logger.info(f"Successfully tested socket binding to {HOST}:{PORT}")
-        except Exception as e:
-            logger.error(f"Failed to bind socket: {e}")
-            raise
+        # Start model initialization in the background
+        asyncio.create_task(initialize_model_async())
         
-        # Initialize other components
-        startup()
-        
-        logger.info("Application startup complete!")
+        logger.info("Application startup complete! Model initialization continuing in background...")
         logger.info(f"Server should be accessible at http://{HOST}:{PORT}")
     except Exception as e:
         logger.error(f"Critical error during startup: {e}", exc_info=True)
@@ -151,7 +158,7 @@ if __name__ == "__main__":
     import uvicorn
     logger.info(f"Running app directly with HOST={HOST} PORT={PORT}")
     uvicorn.run(
-        app,
+        "app.main:app",
         host=HOST,
         port=PORT,
         log_level="info"
