@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+import os
 from app.config import get_settings
 from app.models.llama_model import LlamaModel
 from app.api.routes import router as api_router
@@ -9,6 +10,9 @@ from app.api.api_keys import router as api_key_router
 from app.startup import startup
 
 settings = get_settings()
+
+# Get port from environment variable with a default
+PORT = int(os.getenv("PORT", 8000))
 
 app = FastAPI(
     title="HuggingMind AI - LLaMA 2 Chat API",
@@ -26,6 +30,7 @@ app.add_middleware(
         "http://127.0.0.1:8000",
         "https://huggingmind-ai.vercel.app",  # Your Vercel frontend URL
         "https://huggingmind-backend.onrender.com",  # Your Render backend URL
+        "*",  # Allow all origins in development
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -102,4 +107,9 @@ async def health_check():
 @app.on_event("startup")
 async def on_startup():
     """Initialize application on startup"""
-    startup() 
+    print(f"Starting server on port {PORT}")
+    startup()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=PORT) 
