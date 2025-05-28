@@ -7,4 +7,5 @@ llama-cpp-python[server]==0.2.39
 python-dotenv==1.0.1
 sqlalchemy==2.0.27
 sendgrid==6.11.0
-typing-extensions==4.8.0 
+typing-extensions==4.8.0
+requests==2.31.0 
