@@ -22,15 +22,25 @@ class LlamaModel:
         
         try:
             print("Initializing LLaMA model...")
+            print("MODEL_PATH:", settings.MODEL_PATH)
+            print("MODEL_URL:", settings.MODEL_URL)
+            
+            # Ensure MODEL_PATH is not empty
+            if not settings.MODEL_PATH:
+                settings.MODEL_PATH = "/tmp/model.gguf"
+                print("Empty MODEL_PATH, using default:", settings.MODEL_PATH)
+            
+            # Create the parent directory if it doesn't exist
+            model_dir = os.path.dirname(settings.MODEL_PATH)
+            if model_dir:  # Only create directory if there's a parent path
+                os.makedirs(model_dir, exist_ok=True)
+                print(f"Created directory: {model_dir}")
             
             if settings.MODEL_URL:
                 print("Downloading model from:", settings.MODEL_URL)
                 if not os.path.exists(settings.MODEL_PATH):
                     response = requests.get(settings.MODEL_URL, stream=True)
                     response.raise_for_status()  # Raise an error for bad status codes
-                    
-                    # Create directory if it doesn't exist
-                    os.makedirs(os.path.dirname(settings.MODEL_PATH), exist_ok=True)
                     
                     with open(settings.MODEL_PATH, "wb") as f:
                         for chunk in response.iter_content(chunk_size=8192):
