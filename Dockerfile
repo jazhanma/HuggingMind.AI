@@ -33,21 +33,18 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy only necessary application files
+# Copy application files
 COPY ./app ./app
-COPY start.sh .
+COPY start.py .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
 ENV PORT=8000
 
-# Make start script executable
-RUN chmod +x start.sh
-
-# Health check with longer start period and using PORT env var
+# Health check
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-    CMD curl -f "http://localhost:${PORT:-8000}/health" || exit 1
+    CMD python -c "import requests; requests.get(f'http://localhost:{int(__import__('os').environ.get('PORT', 8000))}/health')" || exit 1
 
 # Command to run the application
-CMD ["./start.sh"] 
+CMD ["python", "start.py"] 
