@@ -39,15 +39,11 @@ COPY Procfile .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
 ENV HOST=0.0.0.0
 
-# Expose the port
-EXPOSE 8000
-
-# Health check - using basic health check endpoint
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check with longer start period and using PORT env var
+HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=3 \
+    CMD curl -f "http://localhost:${PORT}/health" || exit 1
 
 # Command to run the application
 CMD uvicorn app.main:app --host ${HOST} --port ${PORT} --workers 1 --limit-concurrency 1 --timeout-keep-alive 75 --log-level info 

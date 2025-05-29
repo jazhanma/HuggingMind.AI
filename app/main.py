@@ -38,9 +38,8 @@ except ValueError as e:
 HOST = "0.0.0.0"  # Always bind to 0.0.0.0 for container deployments
 logger.info(f"Configuring server with HOST={HOST} and PORT={PORT}")
 
-logger.info(f"Starting application with HOST={HOST} PORT={PORT}")
-logger.info(f"Current working directory: {os.getcwd()}")
-logger.info(f"Environment variables: {dict(os.environ)}")
+# Application state
+server_started = False
 
 app = FastAPI(
     title="HuggingMind AI - LLaMA 2 Chat API",
@@ -119,6 +118,15 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Basic health check that returns 200 if the server is running"""
+    global server_started
+    
+    if not server_started:
+        response.status_code = 503
+        return {
+            "status": "starting",
+            "server": "initializing"
+        }
+    
     return {
         "status": "ok",
         "server": "running"
@@ -127,9 +135,22 @@ async def health_check():
 @app.get("/health/ready")
 async def readiness_check(response: Response):
     """Full health check that includes model status"""
+    global server_started
     model = LlamaModel()
-    is_ready = model._initialized
     
+    if not server_started:
+        response.status_code = 503
+        return {
+            "status": "starting",
+            "details": {
+                "server": "initializing",
+                "model": "not started",
+                "port": PORT,
+                "host": HOST
+            }
+        }
+    
+    is_ready = model._initialized
     if not is_ready:
         response.status_code = 503
         return {
@@ -170,11 +191,16 @@ async def initialize_model():
 @app.on_event("startup")
 async def on_startup():
     """Initialize application on startup"""
+    global server_started
     try:
         logger.info("Starting application initialization...")
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Process ID: {os.getpid()}")
         logger.info(f"Current working directory: {os.getcwd()}")
+        
+        # Mark server as started
+        server_started = True
+        logger.info("Server marked as started")
         
         # Start model initialization in the background
         asyncio.create_task(initialize_model())
