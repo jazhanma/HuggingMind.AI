@@ -4,6 +4,7 @@ import logging
 import traceback
 import uvicorn
 import time
+from app.main import app
 
 # Configure logging
 logging.basicConfig(
@@ -27,20 +28,16 @@ def get_port():
         # Try to convert to integer
         try:
             port = int(port_raw)
+            if port < 1 or port > 65535:
+                logger.warning(f"Port {port} out of valid range, using default 8000")
+                return 8000
+            return port
         except ValueError:
             logger.warning(f"Invalid PORT value {port_raw!r}, using default 8000")
             return 8000
             
-        # Validate port range
-        if port < 1 or port > 65535:
-            logger.warning(f"Port {port} out of valid range (1-65535), using default 8000")
-            return 8000
-            
-        logger.info(f"Using port {port}")
-        return port
-        
     except Exception as e:
-        logger.error(f"Unexpected error getting port: {e}")
+        logger.error(f"Error getting port: {e}")
         return 8000
 
 def main():
@@ -67,7 +64,6 @@ def main():
         
         try:
             # Import app here to ensure environment is set
-            from app.main import app
             logger.info("Application imported successfully")
         except Exception as e:
             logger.error("Failed to import application:")
@@ -77,13 +73,13 @@ def main():
         # Start server
         logger.info(f"Starting uvicorn on port {port}...")
         uvicorn.run(
-            app,
+            "app.main:app",
             host="0.0.0.0",
             port=port,
             workers=1,
-            limit_max_requests=1000,
+            log_level="info",
             timeout_keep_alive=120,
-            log_level="info"
+            reload=False
         )
     except Exception as e:
         logger.error("Critical error during startup:")

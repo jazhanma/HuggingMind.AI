@@ -7,6 +7,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install dependencies
@@ -18,6 +19,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Download model
+RUN mkdir -p /app/models && \
+    curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf \
+    -o /app/models/model.gguf
 
 # Runtime stage
 FROM python:3.10-slim
@@ -33,19 +39,22 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Copy model from builder
+COPY --from=builder /app/models /app/models
+
 # Copy application files
 COPY ./app ./app
 COPY start.py .
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV HOST=0.0.0.0
 ENV PORT=8000
-ENV PYTHONPATH=/app
+ENV HOST=0.0.0.0
+ENV PYTHONUNBUFFERED=1
+ENV MODEL_PATH=/app/models/model.gguf
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
-    CMD curl -f "http://localhost:${PORT}/health" || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Command to run the application
+# Start the application
 CMD ["python", "start.py"] 
