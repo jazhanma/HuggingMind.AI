@@ -12,6 +12,9 @@ from app.api.routes import router as api_router
 from app.api.api_keys import router as api_key_router
 from app.startup import startup
 import time
+import psutil
+import gc
+import torch
 
 # Configure logging
 logging.basicConfig(
@@ -83,27 +86,56 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
+        # Check system resources
+        memory = psutil.virtual_memory()
+        if memory.percent > 90:  # If memory usage is above 90%
+            logger.warning(f"High memory usage: {memory.percent}%")
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
         # Initialize model (uses singleton pattern)
         model = LlamaModel()
         
         # Convert messages to list of dicts
         messages = [msg.dict() for msg in request.messages]
         
-        # Generate response
-        response = await model.chat(
-            messages=messages,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-            top_p=request.top_p,
-            top_k=request.top_k,
-            repeat_penalty=request.repeat_penalty
-        )
+        # Generate response with timeout
+        try:
+            response = await asyncio.wait_for(
+                model.chat(
+                    messages=messages,
+                    max_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    top_p=request.top_p,
+                    top_k=request.top_k,
+                    repeat_penalty=request.repeat_penalty
+                ),
+                timeout=45.0  # 45 second timeout
+            )
+            return ChatResponse(response=response)
+        except asyncio.TimeoutError:
+            logger.error("Chat request timed out")
+            raise HTTPException(
+                status_code=504,
+                detail="Request timed out. Please try again."
+            )
         
-        return ChatResponse(response=response)
-    
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        if "out of memory" in str(e).lower():
+            # Try to recover from OOM
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            raise HTTPException(
+                status_code=503,
+                detail="Server is temporarily out of resources. Please try again in a moment."
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @app.get("/")
 async def root():
@@ -122,17 +154,48 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Basic health check endpoint"""
+    """Enhanced health check endpoint"""
     try:
+        # Get system metrics
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent()
+        
+        # Get model status
+        model = LlamaModel()
+        model_status = "initialized" if model._initialized else "initializing"
+        if model._last_error:
+            model_status = f"error: {model._last_error}"
+        
         uptime = int(time.time() - start_time)
-        return {
-            "status": "healthy",
+        
+        # Check if system is healthy
+        is_healthy = (
+            memory.percent < 95 and  # Memory usage below 95%
+            cpu_percent < 95 and    # CPU usage below 95%
+            model._initialized      # Model is initialized
+        )
+        
+        response = {
+            "status": "healthy" if is_healthy else "unhealthy",
             "uptime_seconds": uptime,
-            "port": os.environ.get("PORT", "8000")
+            "port": os.environ.get("PORT", "8000"),
+            "memory_usage": f"{memory.percent}%",
+            "cpu_usage": f"{cpu_percent}%",
+            "model_status": model_status,
+            "initialization_attempts": model._initialization_attempts
         }
+        
+        if not is_healthy:
+            raise HTTPException(status_code=503, detail=response)
+        
+        return response
+        
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=503,
+            detail=str(e)
+        )
 
 @app.get("/health/ready")
 async def readiness_check(response: Response):
