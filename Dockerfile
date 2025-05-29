@@ -42,7 +42,7 @@ ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
 
 # Health check with longer start period and using PORT env var
-HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
     CMD curl -f "http://localhost:${PORT}/health" || exit 1
 
 # Command to run the application

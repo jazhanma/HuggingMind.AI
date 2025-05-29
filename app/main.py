@@ -40,6 +40,7 @@ logger.info(f"Configuring server with HOST={HOST} and PORT={PORT}")
 
 # Application state
 server_started = False
+startup_time = None
 
 app = FastAPI(
     title="HuggingMind AI - LLaMA 2 Chat API",
@@ -116,66 +117,87 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check():
+async def health_check(response: Response):
     """Basic health check that returns 200 if the server is running"""
     global server_started
     
-    if not server_started:
+    try:
+        if not server_started:
+            response.status_code = 503
+            return {
+                "status": "starting",
+                "server": "initializing",
+                "uptime": "0s"
+            }
+        
+        return {
+            "status": "ok",
+            "server": "running",
+            "uptime": f"{(asyncio.get_event_loop().time() - startup_time):.1f}s"
+        }
+    except Exception as e:
+        logger.error(f"Health check error: {str(e)}")
         response.status_code = 503
         return {
-            "status": "starting",
-            "server": "initializing"
+            "status": "error",
+            "error": str(e)
         }
-    
-    return {
-        "status": "ok",
-        "server": "running"
-    }
 
 @app.get("/health/ready")
 async def readiness_check(response: Response):
     """Full health check that includes model status"""
     global server_started
-    model = LlamaModel()
-    
-    if not server_started:
-        response.status_code = 503
-        return {
-            "status": "starting",
-            "details": {
-                "server": "initializing",
-                "model": "not started",
-                "port": PORT,
-                "host": HOST
+    try:
+        model = LlamaModel()
+        
+        if not server_started:
+            response.status_code = 503
+            return {
+                "status": "starting",
+                "details": {
+                    "server": "initializing",
+                    "model": "not started",
+                    "port": PORT,
+                    "host": HOST,
+                    "uptime": "0s"
+                }
             }
-        }
-    
-    is_ready = model._initialized
-    if not is_ready:
-        response.status_code = 503
+        
+        is_ready = model._initialized
+        if not is_ready:
+            response.status_code = 503
+            return {
+                "status": "initializing",
+                "details": {
+                    "server": "running",
+                    "model": "initializing",
+                    "port": PORT,
+                    "host": HOST,
+                    "pid": os.getpid(),
+                    "cwd": os.getcwd(),
+                    "uptime": f"{(asyncio.get_event_loop().time() - startup_time):.1f}s"
+                }
+            }
+        
         return {
-            "status": "initializing",
+            "status": "ready",
             "details": {
                 "server": "running",
-                "model": "initializing",
+                "model": "initialized",
                 "port": PORT,
                 "host": HOST,
                 "pid": os.getpid(),
-                "cwd": os.getcwd()
+                "cwd": os.getcwd(),
+                "uptime": f"{(asyncio.get_event_loop().time() - startup_time):.1f}s"
             }
         }
-    
-    return {
-        "status": "ready",
-        "details": {
-            "server": "running",
-            "model": "initialized",
-            "port": PORT,
-            "host": HOST,
-            "pid": os.getpid(),
-            "cwd": os.getcwd()
+    except Exception as e:
+        logger.error(f"Readiness check error: {str(e)}")
+        response.status_code = 503
+        return {
+            "status": "error",
+            "error": str(e)
         }
-    }
 
 async def initialize_model():
     """Initialize the model in the background"""
@@ -191,12 +213,15 @@ async def initialize_model():
 @app.on_event("startup")
 async def on_startup():
     """Initialize application on startup"""
-    global server_started
+    global server_started, startup_time
     try:
         logger.info("Starting application initialization...")
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Process ID: {os.getpid()}")
         logger.info(f"Current working directory: {os.getcwd()}")
+        
+        # Record startup time
+        startup_time = asyncio.get_event_loop().time()
         
         # Mark server as started
         server_started = True
