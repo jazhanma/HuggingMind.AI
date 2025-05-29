@@ -40,10 +40,11 @@ COPY start.py .
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
+ENV PORT=8000
 
-# Health check
-HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-    CMD curl -f "http://localhost:${PORT:-8000}/health" || exit 1
+# Health check using default port 8000
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+    CMD curl -f "http://localhost:8000/health" || exit 1
 
 # Command to run the application
 CMD ["python", "start.py"] 

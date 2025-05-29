@@ -1,7 +1,6 @@
 import os
 import sys
 import logging
-from app.main import app
 import uvicorn
 
 # Configure logging
@@ -52,11 +51,18 @@ def main():
         # Get port with proper error handling
         port = get_port()
         
+        # Set the port in environment for other parts of the application
+        os.environ["PORT"] = str(port)
+        
         # Log startup information
         logger.info("Starting server with configuration:")
         logger.info(f"  PORT: {port}")
         logger.info(f"  CWD: {os.getcwd()}")
         logger.info(f"  Python: {sys.version}")
+        logger.info(f"  Environment: {dict(os.environ)}")
+        
+        # Import app here to ensure PORT is set in environment
+        from app.main import app
         
         # Start server
         uvicorn.run(
