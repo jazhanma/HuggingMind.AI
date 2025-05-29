@@ -3,7 +3,7 @@ import sys
 import logging
 import traceback
 import uvicorn
-import asyncio
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -21,73 +21,52 @@ def get_port():
             logger.info(f"  {key}: {value!r}")
         
         # Get raw port value
-        port_raw = os.environ.get("PORT")
+        port_raw = os.environ.get("PORT", "8000")
         logger.info(f"Raw PORT value: {port_raw!r}")
-        
-        # If no port specified, use default
-        if not port_raw:
-            logger.info("No PORT environment variable found, using default port 8000")
-            return 8000
         
         # Try to convert to integer
         try:
             port = int(port_raw)
         except ValueError:
-            logger.error(f"Invalid PORT value {port_raw!r}, using default 8000")
+            logger.warning(f"Invalid PORT value {port_raw!r}, using default 8000")
             return 8000
             
         # Validate port range
         if port < 1 or port > 65535:
-            logger.error(f"Port {port} out of valid range (1-65535), using default 8000")
+            logger.warning(f"Port {port} out of valid range (1-65535), using default 8000")
             return 8000
             
         logger.info(f"Using port {port}")
         return port
         
     except Exception as e:
-        logger.error(f"Unexpected error getting port: {e}", exc_info=True)
+        logger.error(f"Unexpected error getting port: {e}")
         return 8000
-
-async def check_port_availability(port):
-    """Check if port is available"""
-    try:
-        # Try to create a socket and bind to the port
-        server = await asyncio.start_server(
-            lambda r, w: None,
-            '0.0.0.0',
-            port
-        )
-        server.close()
-        await server.wait_closed()
-        logger.info(f"Port {port} is available")
-        return True
-    except Exception as e:
-        logger.error(f"Port {port} is not available: {e}")
-        return False
 
 def main():
     try:
+        # Add startup delay to ensure system is ready
+        time.sleep(2)
+        
         # Log Python version and system info
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Current working directory: {os.getcwd()}")
-        logger.info(f"Files in current directory: {os.listdir()}")
         
         # Get port with proper error handling
         port = get_port()
         
-        # Set the port in environment for other parts of the application
+        # Set environment variables
         os.environ["PORT"] = str(port)
+        os.environ["HOST"] = "0.0.0.0"
         
         # Log startup information
         logger.info("Starting server with configuration:")
         logger.info(f"  PORT: {port}")
+        logger.info(f"  HOST: 0.0.0.0")
         logger.info(f"  CWD: {os.getcwd()}")
-        logger.info(f"  Python: {sys.version}")
-        logger.info(f"  Environment: {dict(os.environ)}")
         
         try:
-            # Import app here to ensure PORT is set in environment
-            logger.info("Importing application...")
+            # Import app here to ensure environment is set
             from app.main import app
             logger.info("Application imported successfully")
         except Exception as e:
@@ -95,20 +74,15 @@ def main():
             logger.error(traceback.format_exc())
             sys.exit(1)
         
-        # Check port availability
-        if not asyncio.run(check_port_availability(port)):
-            logger.error(f"Port {port} is not available, exiting")
-            sys.exit(1)
-        
-        # Start server with increased timeout
+        # Start server
         logger.info(f"Starting uvicorn on port {port}...")
         uvicorn.run(
             app,
             host="0.0.0.0",
             port=port,
             workers=1,
-            limit_concurrency=1,
-            timeout_keep_alive=300,
+            limit_max_requests=1000,
+            timeout_keep_alive=120,
             log_level="info"
         )
     except Exception as e:
