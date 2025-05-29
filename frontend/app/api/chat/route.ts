@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const BACKEND_URL = 'http://127.0.0.1:8000'
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://web-production-cc82b.up.railway.app'
 
 export async function POST(request: Request) {
   try {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       console.error('Fetch error:', fetchError)
       if (fetchError instanceof TypeError && fetchError.message === 'fetch failed') {
         return NextResponse.json(
-          { error: 'Could not connect to the AI backend. Please make sure the backend server is running on http://127.0.0.1:8000' },
+          { error: 'Could not connect to the AI backend. Please make sure the backend is running and accessible.' },
           { status: 503 }
         )
       }
