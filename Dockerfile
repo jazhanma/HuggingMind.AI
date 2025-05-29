@@ -35,15 +35,19 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy only necessary application files
 COPY ./app ./app
-COPY Procfile .
+COPY start.sh .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
+ENV PORT=8000
+
+# Make start script executable
+RUN chmod +x start.sh
 
 # Health check with longer start period and using PORT env var
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-    CMD curl -f "http://localhost:${PORT}/health" || exit 1
+    CMD curl -f "http://localhost:${PORT:-8000}/health" || exit 1
 
 # Command to run the application
-CMD uvicorn app.main:app --host ${HOST} --port ${PORT} --workers 1 --limit-concurrency 1 --timeout-keep-alive 75 --log-level info 
+CMD ["./start.sh"] 
