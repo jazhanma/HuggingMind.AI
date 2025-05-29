@@ -11,6 +11,7 @@ from app.models.llama_model import LlamaModel
 from app.api.routes import router as api_router
 from app.api.api_keys import router as api_key_router
 from app.startup import startup
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -60,6 +61,9 @@ app.add_middleware(
 # Include API routes
 app.include_router(api_router, prefix="/api")
 app.include_router(api_key_router, prefix="/api/keys")
+
+# Track application start time
+start_time = time.time()
 
 class Message(BaseModel):
     role: str
@@ -117,31 +121,18 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check(response: Response):
-    """Basic health check that returns 200 if the server is running"""
-    global server_started
-    
+async def health_check():
+    """Basic health check endpoint"""
     try:
-        if not server_started:
-            response.status_code = 503
-            return {
-                "status": "starting",
-                "server": "initializing",
-                "uptime": "0s"
-            }
-        
+        uptime = int(time.time() - start_time)
         return {
-            "status": "ok",
-            "server": "running",
-            "uptime": f"{(asyncio.get_event_loop().time() - startup_time):.1f}s"
+            "status": "healthy",
+            "uptime_seconds": uptime,
+            "port": os.environ.get("PORT", "8000")
         }
     except Exception as e:
-        logger.error(f"Health check error: {str(e)}")
-        response.status_code = 503
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health/ready")
 async def readiness_check(response: Response):

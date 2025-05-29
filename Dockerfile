@@ -35,15 +35,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application files
 COPY ./app ./app
-COPY start.py .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
 
-# Health check
-HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-    CMD curl -f "http://localhost:8000/health" || exit 1
-
-# We'll let Railway handle the startup command through railway.toml
+# Expose port
 EXPOSE 8000 
