@@ -6,9 +6,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     
-    // Convert the frontend's format to match the backend's ChatRequest model exactly
+    // Extract the message content from the messages array
+    const messageContent = body.messages[0].content
+    
+    // Format request to match backend's expected format
     const backendRequest = {
-      messages: [{ role: "user", content: body.prompt }], // Format as messages array
+      prompt: messageContent,  // Send as prompt instead of messages array
       max_tokens: 2048,
       temperature: 0.7,
       top_p: 0.95,
@@ -22,14 +25,8 @@ export async function POST(request: Request) {
     try {
       // First, test the backend connection
       const healthCheck = await fetch(`${BACKEND_URL}/health`)
-      const healthData = await healthCheck.text()
-      console.log('Health check response:', healthData)
-      
       if (!healthCheck.ok) {
-        return NextResponse.json(
-          { error: `Backend health check failed: ${healthData}` },
-          { status: healthCheck.status }
-        )
+        throw new Error(`Backend health check failed with status: ${healthCheck.status}`)
       }
       console.log('Backend health check successful')
 
@@ -66,7 +63,7 @@ export async function POST(request: Request) {
 
       console.log('Parsed backend response:', data)
       
-      return NextResponse.json({ response: data.response })
+      return NextResponse.json({ response: data.text })  // Changed from data.response to data.text
     } catch (fetchError) {
       console.error('Fetch error:', fetchError)
       return NextResponse.json(
