@@ -1,7 +1,9 @@
 import os
 import sys
 import logging
+import traceback
 import uvicorn
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -46,8 +48,30 @@ def get_port():
         logger.error(f"Unexpected error getting port: {e}", exc_info=True)
         return 8000
 
+async def check_port_availability(port):
+    """Check if port is available"""
+    try:
+        # Try to create a socket and bind to the port
+        server = await asyncio.start_server(
+            lambda r, w: None,
+            '0.0.0.0',
+            port
+        )
+        server.close()
+        await server.wait_closed()
+        logger.info(f"Port {port} is available")
+        return True
+    except Exception as e:
+        logger.error(f"Port {port} is not available: {e}")
+        return False
+
 def main():
     try:
+        # Log Python version and system info
+        logger.info(f"Python version: {sys.version}")
+        logger.info(f"Current working directory: {os.getcwd()}")
+        logger.info(f"Files in current directory: {os.listdir()}")
+        
         # Get port with proper error handling
         port = get_port()
         
@@ -61,21 +85,35 @@ def main():
         logger.info(f"  Python: {sys.version}")
         logger.info(f"  Environment: {dict(os.environ)}")
         
-        # Import app here to ensure PORT is set in environment
-        from app.main import app
+        try:
+            # Import app here to ensure PORT is set in environment
+            logger.info("Importing application...")
+            from app.main import app
+            logger.info("Application imported successfully")
+        except Exception as e:
+            logger.error("Failed to import application:")
+            logger.error(traceback.format_exc())
+            sys.exit(1)
         
-        # Start server
+        # Check port availability
+        if not asyncio.run(check_port_availability(port)):
+            logger.error(f"Port {port} is not available, exiting")
+            sys.exit(1)
+        
+        # Start server with increased timeout
+        logger.info(f"Starting uvicorn on port {port}...")
         uvicorn.run(
             app,
             host="0.0.0.0",
             port=port,
             workers=1,
             limit_concurrency=1,
-            timeout_keep_alive=75,
+            timeout_keep_alive=300,
             log_level="info"
         )
     except Exception as e:
-        logger.error(f"Error starting server: {e}", exc_info=True)
+        logger.error("Critical error during startup:")
+        logger.error(traceback.format_exc())
         sys.exit(1)
 
 if __name__ == "__main__":
