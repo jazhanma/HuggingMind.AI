@@ -21,14 +21,20 @@ export async function POST(request: Request) {
 
     try {
       // First, test the backend connection
-      const healthCheck = await fetch(`${BACKEND_URL}/api/health`)
+      const healthCheck = await fetch(`${BACKEND_URL}/health`)
+      const healthData = await healthCheck.text()
+      console.log('Health check response:', healthData)
+      
       if (!healthCheck.ok) {
-        throw new Error(`Backend health check failed with status: ${healthCheck.status}`)
+        return NextResponse.json(
+          { error: `Backend health check failed: ${healthData}` },
+          { status: healthCheck.status }
+        )
       }
       console.log('Backend health check successful')
 
       // Now send the actual chat request
-      const response = await fetch(`${BACKEND_URL}/chat`, {
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -41,7 +47,10 @@ export async function POST(request: Request) {
       console.log('Raw backend response:', responseText)
 
       if (!response.ok) {
-        throw new Error(`Backend responded with status: ${response.status}. ${responseText}`)
+        return NextResponse.json(
+          { error: `Backend error: ${responseText}` },
+          { status: response.status }
+        )
       }
 
       let data
@@ -49,21 +58,21 @@ export async function POST(request: Request) {
         data = JSON.parse(responseText)
       } catch (parseError) {
         console.error('Failed to parse backend response:', parseError)
-        throw new Error('Backend returned invalid JSON')
+        return NextResponse.json(
+          { error: 'Backend returned invalid JSON' },
+          { status: 500 }
+        )
       }
 
       console.log('Parsed backend response:', data)
       
-      return NextResponse.json({ response: data.response }) // Use data.response since that's what the backend returns
+      return NextResponse.json({ response: data.response })
     } catch (fetchError) {
       console.error('Fetch error:', fetchError)
-      if (fetchError instanceof TypeError && fetchError.message === 'fetch failed') {
-        return NextResponse.json(
-          { error: 'Could not connect to the AI backend. Please make sure the backend is running and accessible.' },
-          { status: 503 }
-        )
-      }
-      throw fetchError
+      return NextResponse.json(
+        { error: 'Could not connect to the AI backend. Please try again in a few minutes.' },
+        { status: 503 }
+      )
     }
   } catch (error) {
     console.error("Error:", error)
