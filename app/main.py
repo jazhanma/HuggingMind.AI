@@ -49,10 +49,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global variable to track model initialization
-model_initialized = False
-model_instance = None
-
 # Include API routes
 app.include_router(api_router, prefix="/api")
 app.include_router(api_key_router, prefix="/api/keys")
@@ -72,32 +68,17 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
-async def initialize_model_async():
-    """Initialize the model in the background"""
-    global model_initialized, model_instance
-    try:
-        logger.info("Starting model initialization in background...")
-        model_instance = LlamaModel()
-        model_initialized = True
-        logger.info("Model initialization complete!")
-    except Exception as e:
-        logger.error(f"Failed to initialize model: {e}")
-        model_initialized = False
-        raise
-
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    global model_initialized, model_instance
-    
-    if not model_initialized:
-        raise HTTPException(status_code=503, detail="Model is still initializing. Please try again in a few minutes.")
-    
     try:
+        # Initialize model (uses singleton pattern)
+        model = LlamaModel()
+        
         # Convert messages to list of dicts
         messages = [msg.dict() for msg in request.messages]
         
         # Generate response
-        response = model_instance.chat(
+        response = await model.chat(
             messages=messages,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -109,15 +90,17 @@ async def chat(request: ChatRequest):
         return ChatResponse(response=response)
     
     except Exception as e:
+        logger.error(f"Error in chat endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():
+    model = LlamaModel()
     return {
         "name": "HuggingMind AI - LLaMA 2 Chat API",
         "version": "1.0.0",
         "model": "LLaMA 2 7B Chat",
-        "model_status": "initialized" if model_initialized else "initializing",
+        "model_status": "initialized" if model._initialized else "initializing",
         "endpoints": {
             "/api/chat": "Chat with the model",
             "/api/keys": "API key management",
@@ -127,14 +110,26 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    model = LlamaModel()
     return {
         "status": "healthy",
         "port": PORT,
         "host": HOST,
         "pid": os.getpid(),
         "cwd": os.getcwd(),
-        "model_status": "initialized" if model_initialized else "initializing"
+        "model_status": "initialized" if model._initialized else "initializing"
     }
+
+async def initialize_model():
+    """Initialize the model in the background"""
+    try:
+        logger.info("Starting model initialization in background...")
+        model = LlamaModel()
+        await model.initialize()
+        logger.info("Model initialization complete!")
+    except Exception as e:
+        logger.error(f"Failed to initialize model: {e}", exc_info=True)
+        raise
 
 @app.on_event("startup")
 async def on_startup():
@@ -146,7 +141,7 @@ async def on_startup():
         logger.info(f"Current working directory: {os.getcwd()}")
         
         # Start model initialization in the background
-        asyncio.create_task(initialize_model_async())
+        asyncio.create_task(initialize_model())
         
         logger.info("Application startup complete! Model initialization continuing in background...")
         logger.info(f"Server should be accessible at http://{HOST}:{PORT}")
