@@ -69,16 +69,23 @@ class LlamaModel:
             if settings.MODEL_URL:
                 logger.info(f"Downloading model from: {settings.MODEL_URL}")
                 if not os.path.exists(settings.MODEL_PATH):
-                    # Download in chunks to avoid blocking
-                    async def download_model():
+                    def download_model():
                         response = requests.get(settings.MODEL_URL, stream=True)
                         response.raise_for_status()
+                        total_size = int(response.headers.get('content-length', 0))
+                        block_size = 8192
+                        downloaded = 0
                         
                         with open(settings.MODEL_PATH, "wb") as f:
-                            for chunk in response.iter_content(chunk_size=8192):
-                                f.write(chunk)
-                                await asyncio.sleep(0)  # Yield to event loop
+                            for chunk in response.iter_content(chunk_size=block_size):
+                                if chunk:
+                                    f.write(chunk)
+                                    downloaded += len(chunk)
+                                    if total_size:
+                                        percent = (downloaded / total_size) * 100
+                                        logger.info(f"Download progress: {percent:.1f}%")
                     
+                    # Run the download in an executor
                     await asyncio.get_event_loop().run_in_executor(None, download_model)
                     logger.info("Model downloaded successfully!")
                 else:
