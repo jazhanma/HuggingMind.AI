@@ -20,9 +20,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download model
+# Download smaller model variant
 RUN mkdir -p /app/models && \
-    curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf \
+    curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf \
     -o /app/models/model.gguf
 
 # Runtime stage
@@ -30,10 +30,11 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies and clean up in one layer
 RUN apt-get update && apt-get install -y \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
@@ -47,10 +48,10 @@ COPY ./app ./app
 COPY start.py .
 
 # Set environment variables
-ENV PORT=8000
-ENV HOST=0.0.0.0
-ENV PYTHONUNBUFFERED=1
-ENV MODEL_PATH=/app/models/model.gguf
+ENV PORT=8000 \
+    HOST=0.0.0.0 \
+    PYTHONUNBUFFERED=1 \
+    MODEL_PATH=/app/models/model.gguf
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

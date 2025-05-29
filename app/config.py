@@ -13,11 +13,11 @@ class Settings(BaseModel):
     MODEL_URL: str = os.getenv("MODEL_URL", "")  # URL to download the model from
     MODEL_PATH: str = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
     CONTEXT_LENGTH: int = int(os.getenv("CONTEXT_LENGTH", "2048"))
-    GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "35"))  # Number of layers to offload to GPU
-    THREADS: int = int(os.getenv("THREADS", "8"))  # Number of CPU threads
+    GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "0"))  # Disable GPU layers for smaller model
+    THREADS: int = int(os.getenv("THREADS", "4"))  # Reduce threads for smaller footprint
     
     # Generation settings
-    MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "2048"))
+    MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))  # Reduced from 2048
     TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.7"))
     TOP_P: float = float(os.getenv("TOP_P", "0.95"))
     TOP_K: int = int(os.getenv("TOP_K", "40"))
