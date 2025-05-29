@@ -4,7 +4,8 @@ import logging
 import traceback
 import uvicorn
 import time
-from app.main import app
+from app.main import app, get_llm  # Import get_llm to pre-load model
+from app.config import get_settings
 
 # Configure logging
 logging.basicConfig(
@@ -43,11 +44,23 @@ def get_port():
 def main():
     try:
         # Add startup delay to ensure system is ready
-        time.sleep(2)
+        time.sleep(5)
         
         # Log Python version and system info
         logger.info(f"Python version: {sys.version}")
         logger.info(f"Current working directory: {os.getcwd()}")
+        
+        # Pre-load the model
+        logger.info("Pre-loading LLM model...")
+        settings = get_settings()
+        logger.info(f"Model path: {settings.MODEL_PATH}")
+        try:
+            llm = get_llm()
+            logger.info("LLM model loaded successfully")
+        except Exception as e:
+            logger.error("Failed to load LLM model:")
+            logger.error(traceback.format_exc())
+            sys.exit(1)
         
         # Get port with proper error handling
         port = get_port()
