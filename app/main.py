@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -22,13 +22,21 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Get port from environment variable with a default
+PORT = None
 try:
-    PORT = int(os.environ.get("PORT", "8000"))
-    HOST = "0.0.0.0"  # Always bind to 0.0.0.0 for container deployments
-    logger.info(f"Configuring server with HOST={HOST} and PORT={PORT}")
-except Exception as e:
-    logger.error(f"Error parsing PORT: {e}")
+    port_str = os.environ.get("PORT")
+    if port_str:
+        PORT = int(port_str)
+        logger.info(f"Using PORT from environment: {PORT}")
+    else:
+        PORT = 8000
+        logger.info(f"No PORT environment variable found, using default: {PORT}")
+except ValueError as e:
+    logger.error(f"Invalid PORT value: {port_str}")
     sys.exit(1)
+
+HOST = "0.0.0.0"  # Always bind to 0.0.0.0 for container deployments
+logger.info(f"Configuring server with HOST={HOST} and PORT={PORT}")
 
 logger.info(f"Starting application with HOST={HOST} PORT={PORT}")
 logger.info(f"Current working directory: {os.getcwd()}")
@@ -110,14 +118,42 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    model = LlamaModel()
+    """Basic health check that returns 200 if the server is running"""
     return {
-        "status": "healthy",
-        "port": PORT,
-        "host": HOST,
-        "pid": os.getpid(),
-        "cwd": os.getcwd(),
-        "model_status": "initialized" if model._initialized else "initializing"
+        "status": "ok",
+        "server": "running"
+    }
+
+@app.get("/health/ready")
+async def readiness_check(response: Response):
+    """Full health check that includes model status"""
+    model = LlamaModel()
+    is_ready = model._initialized
+    
+    if not is_ready:
+        response.status_code = 503
+        return {
+            "status": "initializing",
+            "details": {
+                "server": "running",
+                "model": "initializing",
+                "port": PORT,
+                "host": HOST,
+                "pid": os.getpid(),
+                "cwd": os.getcwd()
+            }
+        }
+    
+    return {
+        "status": "ready",
+        "details": {
+            "server": "running",
+            "model": "initialized",
+            "port": PORT,
+            "host": HOST,
+            "pid": os.getpid(),
+            "cwd": os.getcwd()
+        }
     }
 
 async def initialize_model():
@@ -153,8 +189,11 @@ if __name__ == "__main__":
     import uvicorn
     logger.info(f"Running app directly with HOST={HOST} PORT={PORT}")
     uvicorn.run(
-        "app.main:app",
+        app,
         host=HOST,
         port=PORT,
-        log_level="info"
+        log_level="info",
+        workers=1,
+        limit_concurrency=1,
+        timeout_keep_alive=75
     ) 
