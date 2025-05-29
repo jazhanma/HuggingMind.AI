@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python -c \"import os; os.environ['PORT'] = os.environ.get('PORT', '8000'); import start\""
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10 

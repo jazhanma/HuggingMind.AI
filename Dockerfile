@@ -40,11 +40,10 @@ COPY start.py .
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
-ENV PORT=8000
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-    CMD python -c "import requests; requests.get(f'http://localhost:{int(__import__('os').environ.get('PORT', 8000))}/health')" || exit 1
+    CMD curl -f "http://localhost:8000/health" || exit 1
 
-# Command to run the application
-CMD ["python", "start.py"] 
+# We'll let Railway handle the startup command through railway.toml
+EXPOSE 8000 
