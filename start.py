@@ -1,7 +1,8 @@
 import os
 import sys
-import uvicorn
 import logging
+from app.main import app
+import uvicorn
 
 # Configure logging
 logging.basicConfig(
@@ -13,13 +14,18 @@ logger = logging.getLogger(__name__)
 def get_port():
     """Get port from environment with detailed error handling"""
     try:
+        # Log all environment variables for debugging
+        logger.info("Environment variables:")
+        for key, value in os.environ.items():
+            logger.info(f"  {key}: {value!r}")
+        
         # Get raw port value
         port_raw = os.environ.get("PORT")
         logger.info(f"Raw PORT value: {port_raw!r}")
         
         # If no port specified, use default
         if not port_raw:
-            logger.warning("No PORT environment variable found, using default port 8000")
+            logger.info("No PORT environment variable found, using default port 8000")
             return 8000
         
         # Try to convert to integer
@@ -43,11 +49,6 @@ def get_port():
 
 def main():
     try:
-        # Log environment for debugging
-        logger.info("Environment variables:")
-        for key, value in os.environ.items():
-            logger.info(f"  {key}: {value!r}")
-        
         # Get port with proper error handling
         port = get_port()
         
@@ -59,7 +60,7 @@ def main():
         
         # Start server
         uvicorn.run(
-            "app.main:app",
+            app,
             host="0.0.0.0",
             port=port,
             workers=1,
