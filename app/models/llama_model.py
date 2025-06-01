@@ -2,7 +2,6 @@ import os
 import requests
 import asyncio
 import gc
-import torch
 from typing import List, Optional, Dict, Any
 from llama_cpp import Llama
 from app.config import get_settings
@@ -51,7 +50,6 @@ class LlamaModel:
                     del cls._model
                     cls._model = None
                     gc.collect()
-                    torch.cuda.empty_cache()  # Clear GPU memory if available
                 
                 settings = get_settings()
                 
@@ -60,13 +58,13 @@ class LlamaModel:
                     raise FileNotFoundError(f"Model file not found at {settings.MODEL_PATH}")
                 
                 # Log memory usage before loading
-                logger.info(f"Memory usage before model load: {torch.cuda.memory_allocated() if torch.cuda.is_available() else 'N/A'}")
+                logger.info("Initializing model...")
                 
                 # Initialize model with conservative settings
                 cls._model = Llama(
                     model_path=settings.MODEL_PATH,
                     n_ctx=settings.CONTEXT_LENGTH,
-                    n_gpu_layers=settings.GPU_LAYERS,
+                    n_gpu_layers=0,  # Force CPU only
                     n_threads=settings.THREADS,
                     verbose=True
                 )
@@ -96,7 +94,6 @@ class LlamaModel:
                     del cls._model
                     cls._model = None
                     gc.collect()
-                    torch.cuda.empty_cache()
                 
                 # If we've tried too many times, give up
                 if cls._initialization_attempts >= cls.MAX_RETRIES:
@@ -188,7 +185,6 @@ class LlamaModel:
                 self._initialized = False
                 self._model = None
                 gc.collect()
-                torch.cuda.empty_cache()
             raise
 
     async def generate_response(

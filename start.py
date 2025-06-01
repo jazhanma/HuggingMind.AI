@@ -4,8 +4,9 @@ import logging
 import traceback
 import uvicorn
 import time
-from app.main import app, get_llm  # Import get_llm to pre-load model
+from app.main import app
 from app.config import get_settings
+from app.models.llama_model import LlamaModel
 
 # Configure logging
 logging.basicConfig(
@@ -55,7 +56,7 @@ def main():
         settings = get_settings()
         logger.info(f"Model path: {settings.MODEL_PATH}")
         try:
-            llm = get_llm()
+            model = LlamaModel()
             logger.info("LLM model loaded successfully")
         except Exception as e:
             logger.error("Failed to load LLM model:")

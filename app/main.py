@@ -14,7 +14,6 @@ from app.startup import startup
 import time
 import psutil
 import gc
-import torch
 
 # Configure logging
 logging.basicConfig(
@@ -91,8 +90,6 @@ async def chat(request: ChatRequest):
         if memory.percent > 90:  # If memory usage is above 90%
             logger.warning(f"High memory usage: {memory.percent}%")
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
         
         # Initialize model (uses singleton pattern)
         model = LlamaModel()
@@ -126,8 +123,6 @@ async def chat(request: ChatRequest):
         if "out of memory" in str(e).lower():
             # Try to recover from OOM
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
             raise HTTPException(
                 status_code=503,
                 detail="Server is temporarily out of resources. Please try again in a moment."
@@ -250,7 +245,11 @@ async def readiness_check(response: Response):
         response.status_code = 503
         return {
             "status": "error",
-            "error": str(e)
+            "details": {
+                "error": str(e),
+                "server": "error",
+                "model": "error"
+            }
         }
 
 async def initialize_model():
