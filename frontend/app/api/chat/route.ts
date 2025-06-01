@@ -6,12 +6,25 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     
-    // Extract the message content from the messages array
-    const messageContent = body.messages[0].content
+    // Validate the request body
+    if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid request: messages array is required' },
+        { status: 400 }
+      )
+    }
+
+    const lastMessage = body.messages[body.messages.length - 1]
+    if (!lastMessage || !lastMessage.content) {
+      return NextResponse.json(
+        { error: 'Invalid request: message content is required' },
+        { status: 400 }
+      )
+    }
     
     // Format request to match backend's expected format
     const backendRequest = {
-      prompt: messageContent,  // Send as prompt instead of messages array
+      prompt: lastMessage.content,  // Send the last message's content as prompt
       max_tokens: 2048,
       temperature: 0.7,
       top_p: 0.95,
