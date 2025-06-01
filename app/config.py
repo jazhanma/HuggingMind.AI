@@ -10,7 +10,7 @@ DEFAULT_MODEL_PATH = "/tmp/model.gguf"
 
 class Settings(BaseModel):
     # Model settings
-    MODEL_URL: str = os.getenv("MODEL_URL", "https://huggingface.co/Jazhanma0074/llama-2-7b-chat-gguf/resolve/main/model-q4_k_m.gguf")
+    MODEL_URL: str = os.getenv("MODEL_URL", "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q3_K_S.gguf")
     MODEL_PATH: str = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
     CONTEXT_LENGTH: int = int(os.getenv("CONTEXT_LENGTH", "2048"))
     GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "35"))  # Enable GPU layers for better performance

@@ -17,7 +17,7 @@ RUN apk add --no-cache \
 # Copy requirements and install dependencies
 COPY requirements.txt .
 
-# Create virtual environment and install dependencies
+# Create virtual environment and install dependencies with aggressive cleanup
 RUN python -m venv /opt/venv \
     && . /opt/venv/bin/activate \
     && pip install --no-cache-dir -r requirements.txt \
@@ -28,28 +28,36 @@ RUN python -m venv /opt/venv \
     && find /opt/venv -type f -name "*.pyc" -delete \
     && find /opt/venv -type f -name "*.pyo" -delete \
     && find /opt/venv -type f -name "*.pyd" -delete \
-    && find /opt/venv -type f -name "*.so" -exec strip {} + 2>/dev/null || true
+    && find /opt/venv -type f -name "*.so" -exec strip {} + 2>/dev/null || true \
+    && find /opt/venv -type f -name "*.c" -delete \
+    && find /opt/venv -type f -name "*.h" -delete \
+    && find /opt/venv -type f -name "*.txt" ! -name "requirements.txt" -delete \
+    && find /opt/venv -type f -name "*.md" -delete \
+    && find /opt/venv -type f -name "*.rst" -delete
 
-# Create model directory and download model
+# Create model directory and download model (using Q3_K_S for smaller size)
 RUN mkdir -p /tmp \
-    && curl -L https://huggingface.co/Jazhanma0074/llama-2-7b-chat-gguf/resolve/main/model-q4_k_m.gguf \
+    && curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q3_K_S.gguf \
     -o /tmp/model.gguf \
-    && rm -rf /root/.cache/*
+    && rm -rf /root/.cache/* /tmp/pip-* /tmp/*.whl
 
-# Runtime stage
-FROM python:3.10-alpine
+# Runtime stage with minimal image
+FROM python:3.10-alpine as runtime
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install only essential runtime dependencies
 RUN apk add --no-cache \
     libstdc++ \
     sqlite \
     zlib \
     libjpeg
 
-# Copy virtual environment from builder and set up environment
+# Copy only necessary files from builder
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /tmp/model.gguf /tmp/model.gguf
+
+# Set up environment
 ENV PATH="/opt/venv/bin:$PATH" \
     PORT=8000 \
     HOST=0.0.0.0 \
@@ -60,13 +68,17 @@ ENV PATH="/opt/venv/bin:$PATH" \
     CONTEXT_LENGTH=2048 \
     THREADS=8
 
-# Create necessary directories
-RUN mkdir -p /app/data /app/uploads /tmp && chown 1000:1000 /app/data /app/uploads /tmp
+# Create necessary directories with minimal permissions
+RUN mkdir -p /app/data /app/uploads /tmp \
+    && adduser -D appuser \
+    && chown -R appuser:appuser /app /tmp
 
-# Copy model and application files
-COPY --from=builder /tmp/model.gguf /tmp/model.gguf
-COPY ./app ./app
-COPY start.py .
+# Copy only necessary application files
+COPY --chown=appuser:appuser ./app ./app
+COPY --chown=appuser:appuser start.py .
+
+# Switch to non-root user
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=30s --start-period=300s --retries=3 \
