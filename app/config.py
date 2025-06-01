@@ -6,15 +6,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default to production path if in production environment
-DEFAULT_MODEL_PATH = "/app/models/model.gguf"
+DEFAULT_MODEL_PATH = "/tmp/model.gguf"
 
 class Settings(BaseModel):
     # Model settings
-    MODEL_URL: str = os.getenv("MODEL_URL", "")  # URL to download the model from
+    MODEL_URL: str = os.getenv("MODEL_URL", "https://huggingface.co/Jazhanma0074/llama-2-7b-chat-gguf/resolve/main/model-q4_k_m.gguf")
     MODEL_PATH: str = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
     CONTEXT_LENGTH: int = int(os.getenv("CONTEXT_LENGTH", "2048"))
-    GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "0"))  # Disable GPU layers for smaller model
-    THREADS: int = int(os.getenv("THREADS", "4"))  # Reduce threads for smaller footprint
+    GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "35"))  # Enable GPU layers for better performance
+    THREADS: int = int(os.getenv("THREADS", "8"))  # Adjust threads based on environment
     
     # Generation settings
     MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))  # Reduced from 2048

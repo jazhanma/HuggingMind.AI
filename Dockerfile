@@ -30,10 +30,10 @@ RUN python -m venv /opt/venv \
     && find /opt/venv -type f -name "*.pyd" -delete \
     && find /opt/venv -type f -name "*.so" -exec strip {} + 2>/dev/null || true
 
-# Download smallest model variant and clean up
-RUN mkdir -p /app/models \
-    && curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf \
-    -o /app/models/model.gguf \
+# Create model directory and download model
+RUN mkdir -p /tmp \
+    && curl -L https://huggingface.co/Jazhanma0074/llama-2-7b-chat-gguf/resolve/main/model-q4_k_m.gguf \
+    -o /tmp/model.gguf \
     && rm -rf /root/.cache/*
 
 # Runtime stage
@@ -54,14 +54,17 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PORT=8000 \
     HOST=0.0.0.0 \
     PYTHONUNBUFFERED=1 \
-    MODEL_PATH=/app/models/model.gguf \
-    PYTHONDONTWRITEBYTECODE=1
+    MODEL_PATH=/tmp/model.gguf \
+    PYTHONDONTWRITEBYTECODE=1 \
+    GPU_LAYERS=35 \
+    CONTEXT_LENGTH=2048 \
+    THREADS=8
 
-# Create data and uploads directories
-RUN mkdir -p /app/data /app/uploads /app/models && chown 1000:1000 /app/data /app/uploads /app/models
+# Create necessary directories
+RUN mkdir -p /app/data /app/uploads /tmp && chown 1000:1000 /app/data /app/uploads /tmp
 
 # Copy model and application files
-COPY --from=builder /app/models /app/models
+COPY --from=builder /tmp/model.gguf /tmp/model.gguf
 COPY ./app ./app
 COPY start.py .
 
