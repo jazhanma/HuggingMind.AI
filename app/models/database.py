@@ -3,8 +3,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# SQLite database URL
-SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
+# SQLite database URL - store in /app/data for persistence
+SQLALCHEMY_DATABASE_URL = "sqlite:////app/data/app.db"
 
 # Create SQLAlchemy engine
 engine = create_engine(
@@ -36,6 +36,8 @@ def get_db():
 
 # Create tables
 def init_db():
+    # Ensure the data directory exists
+    os.makedirs("/app/data", exist_ok=True)
     Base.metadata.create_all(bind=engine)
 
 # Initialize database on module import
