@@ -7,6 +7,7 @@ from app.models.database import get_db, APIKeyModel
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os
+import aiofiles
 import shutil
 
 router = APIRouter()
@@ -16,7 +17,7 @@ model = LlamaModel()
 router.include_router(api_key_router, prefix="/keys", tags=["api-keys"])
 
 # Create uploads directory if it doesn't exist
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "/app/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class FileResponse(BaseModel):
@@ -55,10 +56,11 @@ async def upload_file(file: UploadFile = File(...)):
         safe_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{file_extension}"
         file_path = os.path.join(UPLOAD_DIR, safe_filename)
         
-        # Save the file
+        # Save the file using aiofiles
         try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            async with aiofiles.open(file_path, "wb") as buffer:
+                content = await file.read()
+                await buffer.write(content)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -165,7 +167,7 @@ async def chat(request: ChatRequest, api_key: APIKeyModel = Depends(verify_api_k
     Chat with the LLaMA model.
     """
     try:
-        response = model.generate_response(
+        response = await model.generate_response(
             prompt=request.prompt,
             max_tokens=request.max_tokens,
             temperature=request.temperature,

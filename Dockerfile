@@ -9,7 +9,10 @@ RUN apk add --no-cache \
     cmake \
     curl \
     linux-headers \
-    sqlite-dev
+    sqlite-dev \
+    libffi-dev \
+    zlib-dev \
+    jpeg-dev
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
@@ -39,7 +42,11 @@ FROM python:3.10-alpine
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apk add --no-cache libstdc++ sqlite
+RUN apk add --no-cache \
+    libstdc++ \
+    sqlite \
+    zlib \
+    libjpeg
 
 # Copy virtual environment from builder and set up environment
 COPY --from=builder /opt/venv /opt/venv
@@ -50,8 +57,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
     MODEL_PATH=/app/models/model.gguf \
     PYTHONDONTWRITEBYTECODE=1
 
-# Create data directory for SQLite database
-RUN mkdir -p /app/data && chown 1000:1000 /app/data
+# Create data and uploads directories
+RUN mkdir -p /app/data /app/uploads && chown 1000:1000 /app/data /app/uploads
 
 # Copy model and application files
 COPY --from=builder /app/models /app/models
