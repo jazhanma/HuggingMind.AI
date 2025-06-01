@@ -1,18 +1,14 @@
 # Build stage
-FROM python:3.10-alpine as builder
+FROM python:3.10-slim-bullseye as builder
 
 WORKDIR /app
 
-# Install build dependencies and clean up in one layer
-RUN apk add --no-cache \
-    build-base \
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     cmake \
     curl \
-    linux-headers \
-    sqlite-dev \
-    libffi-dev \
-    zlib-dev \
-    jpeg-dev
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
@@ -21,7 +17,7 @@ COPY requirements.txt .
 RUN python -m venv /opt/venv \
     && . /opt/venv/bin/activate \
     && pip install --no-cache-dir -r requirements.txt \
-    && pip uninstall -y torch \
+    && pip uninstall -y torch torchvision torchaudio \
     && find /opt/venv -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true \
     && find /opt/venv -type d -name "*.dist-info" -exec rm -r {} + 2>/dev/null || true \
     && find /opt/venv -type d -name "*.egg-info" -exec rm -r {} + 2>/dev/null || true \
@@ -33,25 +29,30 @@ RUN python -m venv /opt/venv \
     && find /opt/venv -type f -name "*.h" -delete \
     && find /opt/venv -type f -name "*.txt" ! -name "requirements.txt" -delete \
     && find /opt/venv -type f -name "*.md" -delete \
-    && find /opt/venv -type f -name "*.rst" -delete
+    && find /opt/venv -type f -name "*.rst" -delete \
+    && rm -rf /opt/venv/lib/python*/site-packages/numpy/doc/ \
+    && rm -rf /opt/venv/lib/python*/site-packages/numpy/*/tests/ \
+    && rm -rf /opt/venv/lib/python*/site-packages/pip/ \
+    && rm -rf /opt/venv/lib/python*/site-packages/setuptools/ \
+    && rm -rf /opt/venv/lib/python*/site-packages/wheel/
 
-# Create model directory and download model (using Q3_K_S for smaller size)
+# Create model directory and download smallest model (Q2_K)
 RUN mkdir -p /tmp \
-    && curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q3_K_S.gguf \
+    && curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf \
     -o /tmp/model.gguf \
     && rm -rf /root/.cache/* /tmp/pip-* /tmp/*.whl
 
 # Runtime stage with minimal image
-FROM python:3.10-alpine as runtime
+FROM debian:bullseye-slim as runtime
 
 WORKDIR /app
 
 # Install only essential runtime dependencies
-RUN apk add --no-cache \
-    libstdc++ \
-    sqlite \
-    zlib \
-    libjpeg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-minimal \
+    libstdc++6 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy only necessary files from builder
 COPY --from=builder /opt/venv /opt/venv
@@ -64,13 +65,13 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     MODEL_PATH=/tmp/model.gguf \
     PYTHONDONTWRITEBYTECODE=1 \
-    GPU_LAYERS=35 \
+    GPU_LAYERS=0 \
     CONTEXT_LENGTH=2048 \
-    THREADS=8
+    THREADS=4
 
 # Create necessary directories with minimal permissions
 RUN mkdir -p /app/data /app/uploads /tmp \
-    && adduser -D appuser \
+    && useradd -r -s /bin/false appuser \
     && chown -R appuser:appuser /app /tmp
 
 # Copy only necessary application files
@@ -82,7 +83,7 @@ USER appuser
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=30s --start-period=300s --retries=3 \
-    CMD wget -q --spider http://localhost:${PORT}/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Start the application
-CMD ["python", "start.py"] 
+CMD ["python3", "start.py"] 

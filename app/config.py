@@ -10,11 +10,11 @@ DEFAULT_MODEL_PATH = "/tmp/model.gguf"
 
 class Settings(BaseModel):
     # Model settings
-    MODEL_URL: str = os.getenv("MODEL_URL", "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q3_K_S.gguf")
+    MODEL_URL: str = os.getenv("MODEL_URL", "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf")
     MODEL_PATH: str = os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH)
     CONTEXT_LENGTH: int = int(os.getenv("CONTEXT_LENGTH", "2048"))
-    GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "35"))  # Enable GPU layers for better performance
-    THREADS: int = int(os.getenv("THREADS", "8"))  # Adjust threads based on environment
+    GPU_LAYERS: int = int(os.getenv("GPU_LAYERS", "0"))  # Disable GPU layers for minimal resource usage
+    THREADS: int = int(os.getenv("THREADS", "4"))  # Reduce threads for smaller footprint
     
     # Generation settings
     MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))  # Reduced from 2048
