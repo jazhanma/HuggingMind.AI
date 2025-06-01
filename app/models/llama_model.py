@@ -53,12 +53,23 @@ class LlamaModel:
                 
                 settings = get_settings()
                 
+                # Log model path for debugging
+                logger.info(f"Attempting to load model from: {settings.MODEL_PATH}")
+                
                 # Verify model file exists
                 if not os.path.exists(settings.MODEL_PATH):
+                    # Check if model directory exists
+                    model_dir = os.path.dirname(settings.MODEL_PATH)
+                    if not os.path.exists(model_dir):
+                        os.makedirs(model_dir, exist_ok=True)
+                        logger.info(f"Created model directory: {model_dir}")
+                    
                     raise FileNotFoundError(f"Model file not found at {settings.MODEL_PATH}")
                 
-                # Log memory usage before loading
-                logger.info("Initializing model...")
+                # Log file size and permissions
+                file_stat = os.stat(settings.MODEL_PATH)
+                logger.info(f"Model file size: {file_stat.st_size} bytes")
+                logger.info(f"Model file permissions: {oct(file_stat.st_mode)}")
                 
                 # Initialize model with conservative settings
                 cls._model = Llama(
@@ -83,11 +94,13 @@ class LlamaModel:
                 
                 cls._initialized = True
                 cls._last_error = None
+                cls._initialization_attempts = 0
                 logger.info("Model initialized successfully!")
                 
             except Exception as e:
+                cls._initialization_attempts += 1
                 cls._last_error = str(e)
-                logger.error(f"Model initialization failed: {e}", exc_info=True)
+                logger.error(f"Model initialization failed (attempt {cls._initialization_attempts}/{cls.MAX_RETRIES}): {e}", exc_info=True)
                 
                 # Cleanup on failure
                 if cls._model is not None:

@@ -58,7 +58,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 # Create data and uploads directories
-RUN mkdir -p /app/data /app/uploads && chown 1000:1000 /app/data /app/uploads
+RUN mkdir -p /app/data /app/uploads /app/models && chown 1000:1000 /app/data /app/uploads /app/models
 
 # Copy model and application files
 COPY --from=builder /app/models /app/models

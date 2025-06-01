@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default to production path if in production environment
-DEFAULT_MODEL_PATH = "/tmp/model.gguf"
+DEFAULT_MODEL_PATH = "/app/models/model.gguf"
 
 class Settings(BaseModel):
     # Model settings
